@@ -87,7 +87,7 @@ All three "agents" currently live as pure functions inside `backend.py::synthesi
 | Name | Role | GitHub |
 | --- | --- | --- |
 | Priyanka Kumari Gond | Team Leader | <img src="https://github.com/Priyanka331.png" width="40"> |
-| Chitrarup Guha | Developer | <img src="https://github.com/B.png" width="40"> |
+| Chitrarup Guha | Developer | <img src="https://github.com/ChitrarupGuha.png" width="40"> |
 | Mrittika Adhikary | R&D | <img src="https://github.com/mrittikaadhikary17-ctrl.png" width="40"> |
 | Ayush Sarkar | Designer | <img src="https://github.com/Ayush789025.png" width="40"> |
 
