@@ -1,0 +1,11 @@
+1. python -m venv venv
+
+2. venv\Scripts\activate
+
+3. Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+4. python -m uvicorn backend:app --reload --port 8000
+
+5. pip install fastapi uvicorn
+
+6. uvicorn backend:app --reload --port 8000
