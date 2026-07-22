@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multi-Agent Orchestrator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-main: #121212;
+    --panel-bg: #1e1e1e;
+    --panel-border: #333;
+    --text-primary: #f0f0f0;
+    --text-secondary: #a0a0a0;
+    --accent-teal: #00d2ff;
+    --accent-green: #3be88f;
+    --accent-orange: #f2b134;
+    --accent-red: #ef5b5b;
+    --accent-purple: #8e44ad;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-sans: 'Inter', sans-serif;
+    --font-disp: 'Space Grotesk', sans-serif;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-image: radial-gradient(circle at top right, rgba(0, 210, 255, 0.05), transparent 40%),
+                      radial-gradient(circle at bottom left, rgba(59, 232, 143, 0.05), transparent 40%);
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* Header Styles */
+  header {
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .header-title {
+    font-family: var(--font-disp);
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .agent-status {
+    display: flex;
+    gap: 16px;
+  }
+
+  .status-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--panel-border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.03);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .dot.active { background-color: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+  .dot.processing { background-color: var(--accent-teal); box-shadow: 0 0 8px var(--accent-teal); animation: pulse 1.5s infinite; }
+  
+  @keyframes pulse {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+  }
+
+  /* Layout Grid */
+  .orchestrator-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    flex: 1;
+  }
+
+  /* Panel Styles */
+  .panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+  }
+
+  .panel.iot-panel::before { background: var(--accent-green); }
+  .panel.supply-panel::before { background: var(--accent-orange); }
+  .panel.fleet-panel::before { background: var(--accent-purple); }
+  .panel.orchestrator-panel::before { background: var(--accent-teal); }
+
+  .panel-header {
+    margin-bottom: 20px;
+  }
+
+  .panel-title {
+    font-family: var(--font-disp);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0 0 4px 0;
+  }
+
+  .panel-subtitle {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* Form Elements */
+  .input-group {
+    margin-bottom: 16px;
+  }
+
+  .input-group label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .input-wrapper {
+    display: flex;
+    align-items: center;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 8px 12px;
+  }
+
+  .input-wrapper input, .input-wrapper select {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    width: 100%;
+    outline: none;
+  }
+
+  .input-unit {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-left: 8px;
+  }
+
+  /* Output/Display Elements */
+  .data-feed {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 12px;
+    height: 150px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .feed-item {
+    padding-bottom: 8px;
+    border-bottom: 1px dashed #333;
+  }
+  .feed-item:last-child { border-bottom: none; padding-bottom: 0; }
+  
+  .feed-time { color: var(--text-secondary); font-size: 10px; margin-right: 8px; }
+  .feed-high { color: var(--accent-red); }
+  .feed-warn { color: var(--accent-orange); }
+
+  /* Orchestrator Bottom Panel */
+  .orchestrator-bottom {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 24px;
+    margin-top: 8px;
+  }
+
+  .action-btn {
+    background: rgba(0, 210, 255, 0.1);
+    border: 1px solid var(--accent-teal);
+    color: var(--accent-teal);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 12px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+    margin-top: auto;
+  }
+
+  .action-btn:hover {
+    background: rgba(0, 210, 255, 0.2);
+    transform: translateY(-1px);
+  }
+
+  .action-btn:active {
+    transform: translateY(1px);
+  }
+
+  /* Results Display */
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .result-card {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .result-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .result-value {
+    font-family: var(--font-disp);
+    font-size: 24px;
+    font-weight: 600;
+  }
+
+  .result-value.good { color: var(--accent-green); }
+  .result-value.warn { color: var(--accent-orange); }
+  .result-value.bad { color: var(--accent-red); }
+
+  .reasoning-box {
+    margin-top: 16px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    background: rgba(0,0,0,0.3);
+    padding: 12px;
+    border-left: 3px solid var(--accent-teal);
+    border-radius: 0 4px 4px 0;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #555; }
+  
+  @media (max-width: 1024px) {
+    .orchestrator-grid { grid-template-columns: 1fr; }
+    .orchestrator-bottom { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-title">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+        <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+        <line x1="6" y1="6" x2="6.01" y2="6"></line>
+        <line x1="6" y1="18" x2="6.01" y2="18"></line>
+      </svg>
+      Agent Orchestrator
+    </div>
+    <div class="agent-status">
+      <div class="status-badge"><span class="dot active"></span> Telemetry Agent</div>
+      <div class="status-badge"><span class="dot active"></span> Supply Risk Agent</div>
+      <div class="status-badge"><span class="dot active"></span> Fleet Planner</div>
+    </div>
+  </header>
+
+  <div class="orchestrator-grid">
+    <!-- IoT Telemetry Input Panel -->
+    <div class="panel iot-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">IoT Telemetry Input</h2>
+        <div class="panel-subtitle">Manual overrides for vehicle conditions</div>
+      </div>
+      
+      <div class="input-group">
+        <label>Vehicle Name</label>
+        <div class="input-wrapper">
+          <input type="text" id="input-name" value="VAN-014" placeholder="e.g. VAN-014">
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>Ambient Temperature</label>
+        <div class="input-wrapper">
+          <input type="number" id="input-temp" value="35" step="1">
+          <span class="input-unit">°C</span>
+        </div>
+      </div>
+      
+      <div class="input-group">
+        <label>Vehicle Speed</label>
+        <div class="input-wrapper">
+          <input type="number" id="input-speed" value="65" step="5">
+          <span class="input-unit">km/h</span>
+        </div>
+      </div>
+      
+      <div class="input-group">
+        <label>Current Charge Level (SoC)</label>
+        <div class="input-wrapper">
+          <input type="number" id="input-charge" value="42" min="0" max="100">
+          <span class="input-unit">%</span>
+        </div>
+      </div>
+
+       <div class="input-group">
+        <label>Charge Cycles Logged</label>
+        <div class="input-wrapper">
+          <input type="number" id="input-cycles" value="1250" min="0">
+          <span class="input-unit">cycles</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Supply/News Feed Panel -->
+    <div class="panel supply-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Environmental & Supply Feed</h2>
+        <div class="panel-subtitle">Live API simulation (GHG & Material Risk)</div>
+      </div>
+      
+      <div class="input-group">
+        <label>Local GHG Concentration API</label>
+        <div class="input-wrapper">
+          <input type="number" id="input-ghg" value="418" step="0.5">
+          <span class="input-unit">ppm CO2e</span>
+        </div>
+      </div>
+
+      <label style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; display:block;">Live Risk News Feed</label>
+      <div class="data-feed" id="news-feed">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Fleet Route Conditions Panel -->
+    <div class="panel fleet-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Route & Aero Conditions</h2>
+        <div class="panel-subtitle">Factors affecting energy consumption</div>
+      </div>
+
+      <div class="input-group">
+        <label>Route Distance</label>
+        <div class="input-wrapper">
+          <input type="number" id="input-distance" value="120" step="5">
+          <span class="input-unit">km</span>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>Payload Weight</label>
+        <div class="input-wrapper">
+          <input type="number" id="input-payload" value="4500" step="100">
+          <span class="input-unit">kg</span>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label>Weather Condition (Aero Drag Effect)</label>
+        <div class="input-wrapper">
+          <select id="input-weather">
+            <option value="1.0">Clear / Calm (Normal Drag)</option>
+            <option value="1.15">Heavy Rain (Increased Drag)</option>
+            <option value="1.25">Strong Headwind (High Drag)</option>
+            <option value="1.3">Snow / Slush (Severe Drag)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Vehicle Panel -->
+  <div class="panel" style="border-color: var(--panel-border);">
+    <div class="panel-header">
+      <h2 class="panel-title">Rename Vehicle</h2>
+      <div class="panel-subtitle">Fix a typo or relabel a car already synced to the dashboard — keeps its data, just changes the name</div>
+    </div>
+    <div style="display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap;">
+      <div class="input-group" style="margin-bottom:0; min-width:180px; flex:1;">
+        <label>Existing vehicle</label>
+        <div class="input-wrapper">
+          <select id="rename-select"><option>Loading…</option></select>
+        </div>
+      </div>
+      <div class="input-group" style="margin-bottom:0; min-width:180px; flex:1;">
+        <label>New name</label>
+        <div class="input-wrapper">
+          <input type="text" id="rename-new" placeholder="e.g. VAN-014B">
+        </div>
+      </div>
+      <button class="action-btn" style="width:auto; margin-top:0; padding:8px 20px;" onclick="renameVehicle()">Rename</button>
+    </div>
+    <div id="rename-status" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); margin-top: 10px;"></div>
+  </div>
+
+  <!-- Orchestrator Output Panel -->
+  <div class="orchestrator-bottom">
+    <div class="panel orchestrator-panel" style="justify-content: center;">
+      <div class="panel-header" style="margin-bottom: 10px;">
+        <h2 class="panel-title">Central Orchestrator</h2>
+        <div class="panel-subtitle">Combine agent data & synthesize insights</div>
+      </div>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
+        Clicking this will run the Telemetry, Supply, and Fleet agents locally for an instant preview, then send the synthesized result to the backend so it shows up on the live fleet dashboard.
+      </p>
+      <button class="action-btn" id="run-orchestrator" onclick="runSimulation()">
+        <span id="btn-text">Run Multi-Agent Analysis</span>
+      </button>
+      <div id="sync-status" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: center;"></div>
+    </div>
+
+    <div class="panel" style="border-color: var(--accent-teal);">
+       <div class="panel-header">
+        <h2 class="panel-title">Synthesized Output</h2>
+        <div class="panel-subtitle">Live Dashboard Feed</div>
+      </div>
+      
+      <div class="results-grid">
+        <div class="result-card">
+          <div class="result-label">Predicted Energy Req.</div>
+          <div class="result-value" id="out-energy">-- <span style="font-size: 12px; color:var(--text-secondary)">kWh</span></div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Degradation Risk</div>
+          <div class="result-value" id="out-risk">--</div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Carbon Offset vs Diesel</div>
+          <div class="result-value" id="out-carbon">-- <span style="font-size: 12px; color:var(--text-secondary)">kg CO2e</span></div>
+        </div>
+      </div>
+
+      <div class="reasoning-box" id="out-reasoning">
+        Awaiting input parameters to begin simulation...
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // --- Simulate Live News Feed ---
+  const newsItems = [
+    "GLOBAL: Lithium carbonate prices spike 4% amid Chile port delays.",
+    "ENV: Urban GHG concentration in Route Sector A exceeding baseline.",
+    "SUPPLY: Cobalt refiner in DRC reports maintenance outage.",
+    "LOCAL: High temperatures predicted to accelerate thermal aging in LFP packs.",
+    "GRID: Renewable energy mix currently at 68%, optimal charging window open."
+  ];
+
+  const feedContainer = document.getElementById('news-feed');
+  
+  function addNewsItem() {
+    const item = newsItems[Math.floor(Math.random() * newsItems.length)];
+    const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+    
+    let colorClass = '';
+    if(item.includes('spike') || item.includes('exceeding')) colorClass = 'feed-warn';
+    if(item.includes('outage')) colorClass = 'feed-high';
+
+    const div = document.createElement('div');
+    div.className = 'feed-item';
+    div.innerHTML = `<span class="feed-time">[${time}]</span> <span class="${colorClass}">${item}</span>`;
+    
+    feedContainer.prepend(div);
+    if(feedContainer.children.length > 6) {
+      feedContainer.removeChild(feedContainer.lastChild);
+    }
+  }
+
+  // Start news feed
+  setInterval(addNewsItem, 3500);
+  addNewsItem(); addNewsItem(); // populate initial
+
+  // --- Multi-Agent Simulation Logic ---
+  function runSimulation() {
+    // 1. UI Loading State
+    const btn = document.getElementById('run-orchestrator');
+    const btnText = document.getElementById('btn-text');
+    const dots = document.querySelectorAll('.dot');
+    
+    btn.disabled = true;
+    btnText.textContent = "Agents Analyzing...";
+    dots.forEach(d => { d.classList.remove('active'); d.classList.add('processing'); });
+    
+    document.getElementById('out-reasoning').innerHTML = "<em>Orchestrator is fusing data streams...</em>";
+    document.getElementById('out-energy').innerHTML = "--";
+    document.getElementById('out-risk').innerHTML = "--";
+    document.getElementById('out-carbon').innerHTML = "--";
+
+    // 2. Gather Inputs
+    const name = document.getElementById('input-name').value.trim() || 'UNNAMED';
+    // Telemetry
+    const temp = parseFloat(document.getElementById('input-temp').value);
+    const speed = parseFloat(document.getElementById('input-speed').value);
+    const charge = parseFloat(document.getElementById('input-charge').value);
+    const cycles = parseFloat(document.getElementById('input-cycles').value);
+    
+    // Fleet/Aero
+    const distance = parseFloat(document.getElementById('input-distance').value);
+    const payload = parseFloat(document.getElementById('input-payload').value);
+    const weatherDrag = parseFloat(document.getElementById('input-weather').value);
+    
+    // Env
+    const ghg = parseFloat(document.getElementById('input-ghg').value);
+
+    // 3. Simulate processing delay
+    setTimeout(() => {
+      // --- Calculations (Simulating Agent Logic) ---
+      
+      // A. Fleet Planner Agent: Energy Calculation
+      // Base consumption roughly 1.2 kWh/km for a loaded truck.
+      let baseEnergyPerKm = 1.2 + (payload / 10000); // add energy for weight
+      
+      // Speed effect (aerodynamic drag increases with square of velocity, simplified here)
+      // Optimal speed ~60km/h. Penalty if faster or much slower.
+      let speedFactor = 1.0;
+      if (speed > 60) speedFactor = 1 + ((speed - 60) * 0.015);
+      
+      // Combine factors
+      const totalEnergyReq = distance * baseEnergyPerKm * speedFactor * weatherDrag;
+
+      // B. Telemetry Agent: Degradation Risk
+      let riskLevel = "LOW";
+      let riskClass = "good";
+      let riskReason = "Optimal parameters.";
+
+      if (temp > 40) {
+        riskLevel = "CRITICAL"; riskClass = "bad"; riskReason = "Thermal runaway risk high due to temp > 40C.";
+      } else if (temp < 0) {
+        riskLevel = "HIGH"; riskClass = "warn"; riskReason = "Cold weather significantly reducing cell efficiency.";
+      } else if (cycles > 2000) {
+         riskLevel = "HIGH"; riskClass = "warn"; riskReason = "High cycle count indicates imminent capacity fade.";
+      } else if (charge < (totalEnergyReq / 3)) { // Assuming a 300kWh battery for rough math
+         riskLevel = "WARNING"; riskClass = "warn"; riskReason = "Current SoC may be insufficient for route given drag factors.";
+      }
+
+      // C. Supply/Env Agent: Carbon Savings
+      // Diesel truck emits ~1000g CO2 per km.
+      // EV grid emissions vary based on GHG input (simulating grid dirtiness)
+      const dieselEmissions = distance * 1.0; // in kg
+      const evEmissions = totalEnergyReq * (ghg / 1000); // rough conversion factor using the GHG ppm as a proxy for grid dirtiness
+      let carbonSaved = dieselEmissions - evEmissions;
+      if (carbonSaved < 0) carbonSaved = 0;
+
+      // 4. Update UI
+      document.getElementById('out-energy').innerHTML = `${totalEnergyReq.toFixed(1)} <span style="font-size: 12px; color:var(--text-secondary)">kWh</span>`;
+      
+      const riskEl = document.getElementById('out-risk');
+      riskEl.textContent = riskLevel;
+      riskEl.className = `result-value ${riskClass}`;
+
+      document.getElementById('out-carbon').innerHTML = `${carbonSaved.toFixed(1)} <span style="font-size: 12px; color:var(--text-secondary)">kg CO2e</span>`;
+
+      // 5. Generate Reasoning Text
+      let reasoningText = `<strong>Orchestrator Synthesis:</strong><br>`;
+      reasoningText += `• <strong>Fleet Agent:</strong> Calculated ${totalEnergyReq.toFixed(1)} kWh needed for ${distance}km route. Drag factor of ${weatherDrag}x applied due to weather conditions. Speed penalty is ${(speedFactor*100 - 100).toFixed(1)}%.<br>`;
+      reasoningText += `• <strong>Telemetry Agent:</strong> Battery health assessment: ${riskReason}<br>`;
+      reasoningText += `• <strong>Environment Agent:</strong> Local GHG index at ${ghg}ppm. EV deployment on this route saves ${carbonSaved.toFixed(1)}kg of CO2e compared to a heavy diesel asset.`;
+      
+      document.getElementById('out-reasoning').innerHTML = reasoningText;
+
+      // 6. Sync to backend so this vehicle shows up on the live fleet dashboard
+      const syncEl = document.getElementById('sync-status');
+      syncEl.textContent = 'Syncing to fleet dashboard…';
+      fetch('/api/vehicles', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          name, temp, speed, charge, cycles,
+          distance, payload, weather_drag: weatherDrag, ghg
+        })
+      })
+      .then(res => { if(!res.ok) throw new Error('Backend error ' + res.status); return res.json(); })
+      .then(() => { syncEl.textContent = `✓ ${name} synced to fleet dashboard`; syncEl.style.color = 'var(--accent-green)'; loadVehicleNames(); })
+      .catch(err => { syncEl.textContent = '✗ Could not reach backend — is it running?'; syncEl.style.color = 'var(--accent-red)'; });
+
+      // 7. Reset UI State
+      btn.disabled = false;
+      btnText.textContent = "Run Multi-Agent Analysis";
+      dots.forEach(d => { d.classList.remove('processing'); d.classList.add('active'); });
+
+    }, 1500); // 1.5s simulated processing time
+  }
+  // --- Rename Vehicle panel ---
+  async function loadVehicleNames(){
+    const select = document.getElementById('rename-select');
+    try{
+      const res = await fetch('/api/vehicles');
+      if(!res.ok) throw new Error();
+      const data = await res.json();
+      if(!data.length){
+        select.innerHTML = '<option>No vehicles synced yet</option>';
+        return;
+      }
+      select.innerHTML = data.map(v => `<option value="${v.name}">${v.name}</option>`).join('');
+    }catch(e){
+      select.innerHTML = '<option>Backend unreachable</option>';
+    }
+  }
+  loadVehicleNames();
+
+  function renameVehicle(){
+    const select = document.getElementById('rename-select');
+    const oldName = select.value;
+    const newName = document.getElementById('rename-new').value.trim();
+    const statusEl = document.getElementById('rename-status');
+
+    if(!oldName || oldName.includes(' ')){
+      statusEl.textContent = 'No vehicle selected.';
+      statusEl.style.color = 'var(--accent-orange)';
+      return;
+    }
+    if(!newName){
+      statusEl.textContent = 'Enter a new name first.';
+      statusEl.style.color = 'var(--accent-orange)';
+      return;
+    }
+
+    statusEl.textContent = `Renaming ${oldName} → ${newName}…`;
+    statusEl.style.color = 'var(--text-secondary)';
+
+    fetch(`/api/vehicles/${encodeURIComponent(oldName)}/rename`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({new_name: newName})
+    })
+    .then(async res => {
+      if(!res.ok){
+        const err = await res.json().catch(()=>({detail:'Unknown error'}));
+        throw new Error(err.detail || `Backend error ${res.status}`);
+      }
+      return res.json();
+    })
+    .then(() => {
+      statusEl.textContent = `✓ Renamed to ${newName}`;
+      statusEl.style.color = 'var(--accent-green)';
+      document.getElementById('rename-new').value = '';
+      loadVehicleNames();
+    })
+    .catch(err => {
+      statusEl.textContent = `✗ ${err.message}`;
+      statusEl.style.color = 'var(--accent-red)';
+    });
+  }
+</script>
+</body>
+</html>
